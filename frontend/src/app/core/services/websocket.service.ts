@@ -17,7 +17,7 @@ export class WebsocketService {
 
     this.client = new Client({
       // @ts-ignore
-      webSocketFactory: () => new SockJS('http://127.0.0.1:8081/ws'),
+      webSocketFactory: () => new SockJS('http://localhost:8081/ws'),
       connectHeaders: {
         Authorization: `Bearer ${token}`
       },

@@ -1,0 +1,23 @@
+# Sensitive config files
+application.properties
+application.yml
+*.properties
+*.yml
+
+# Build output
+target/
+build/
+out/
+
+# Logs
+*.log
+logs/
+
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp

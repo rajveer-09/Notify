@@ -1,0 +1,29 @@
+package com.notification.domain.notification.repository;
+
+import com.notification.domain.notification.entity.Notification;
+import com.notification.domain.user.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import org.springframework.data.jpa.repository.EntityGraph;
+
+public interface NotificationRepository extends JpaRepository<Notification, Long> {
+    Page<Notification> findByRecipient(User recipient, Pageable pageable);
+    
+    long countByRecipientAndReadFalse(User recipient);
+    
+    @Modifying
+    @Query("UPDATE Notification n SET n.read = true WHERE n.recipient = :recipient")
+    void markAllAsReadByRecipient(@Param("recipient") User recipient);
+
+    @Override
+    @EntityGraph(attributePaths = {"recipient"})
+    Page<Notification> findAll(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"recipient"})
+    Page<Notification> findByMessageContainingIgnoreCaseOrRecipientEmailContainingIgnoreCase(String message, String email, Pageable pageable);
+}

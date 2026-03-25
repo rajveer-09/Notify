@@ -1,6 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subject, of, Subscription } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, catchError } from 'rxjs/operators';
 import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
@@ -48,25 +50,48 @@ import { NotificationService } from '../../core/services/notification.service';
                 </div>
               </div>
               
-              <div class="form-group flex-1" *ngIf="mode === 'USER'">
-                <label>Recipient ID</label>
-                <input type="text" [(ngModel)]="targetUsername" name="targetUsername" placeholder="Username" class="premium-input">
-              </div>
-
-              <div class="form-group flex-1" *ngIf="mode === 'DEPARTMENT'">
-                <label>Target Department</label>
-                <select [(ngModel)]="targetDepartment" name="targetDepartment" class="premium-input">
-                  <option value="" disabled selected>Select Department</option>
-                  <option *ngFor="let d of departments" [value]="d">{{d}}</option>
-                </select>
-              </div>
-
               <div class="form-group flex-1">
                 <label>Priority level</label>
                 <select [(ngModel)]="notificationType" name="type" class="premium-input">
                   <option value="INFO">Informational</option>
                   <option value="WARNING">Elevated</option>
                   <option value="ACTION_REQUIRED">Critical Path</option>
+                </select>
+              </div>
+
+              <div class="form-group flex-1" [class.hidden-v]="mode === 'ALL'">
+                <label *ngIf="mode === 'USER'">Recipients (Search by Email)</label>
+                <label *ngIf="mode === 'DEPARTMENT'">Target Department</label>
+                <label *ngIf="mode === 'ALL'">&nbsp;</label>
+
+                <div class="search-tag-container premium-input" *ngIf="mode === 'USER'">
+                  <div class="search-top-bar">
+                    <svg viewBox="0 0 24 24" class="icon mini-icon search-icon-left"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" [(ngModel)]="userSearch" name="search" placeholder="Type name or email..." (input)="filterUsers()" class="search-input">
+                  </div>
+                  
+                  <div class="inline-results" *ngIf="userSearch && filteredUsers.length > 0">
+                    <div *ngFor="let u of filteredUsers" (click)="addEmail(u.email)" class="search-item mini-item animate-fade">
+                      <div class="item-info">
+                        <span class="item-name">{{u.username}}</span>
+                        <span class="item-email">{{u.email}}</span>
+                      </div>
+                      <svg viewBox="0 0 24 24" class="icon mini-icon add-icon"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </div>
+                  </div>
+
+                  <div class="selected-tags-area">
+                    <div class="tags-placeholder" *ngIf="selectedEmails.length === 0 && !userSearch">Selected recipients will appear here...</div>
+                    <span *ngFor="let email of selectedEmails" class="user-tag animate-fade">
+                      {{email}}
+                      <button (click)="removeEmail(email)" class="remove-tag">×</button>
+                    </span>
+                  </div>
+                </div>
+
+                <select [(ngModel)]="targetDepartment" name="targetDepartment" class="premium-input" *ngIf="mode === 'DEPARTMENT'">
+                  <option value="" disabled selected>Select Department</option>
+                  <option *ngFor="let d of departments" [value]="d">{{d}}</option>
                 </select>
               </div>
             </div>
@@ -81,7 +106,7 @@ import { NotificationService } from '../../core/services/notification.service';
                {{successMsg}}
             </div>
             
-            <button type="submit" class="btn btn-dispatch" [disabled]="!message || (mode === 'USER' && !targetUsername) || (mode === 'DEPARTMENT' && !targetDepartment)">
+            <button type="submit" class="btn btn-dispatch" [disabled]="!message || (mode === 'USER' && selectedEmails.length === 0) || (mode === 'DEPARTMENT' && !targetDepartment)">
               Initialize Transmission 
               <svg viewBox="0 0 24 24" class="icon btn-icon-right"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
             </button>
@@ -94,6 +119,18 @@ import { NotificationService } from '../../core/services/notification.service';
             <h3>Archived Logs</h3>
             <p class="card-subtitle">View all previous system communications</p>
           </div>
+          
+          <!-- History Search Bar -->
+          <div class="search-box-container animate-fade">
+            <div class="premium-search-bar">
+              <svg viewBox="0 0 24 24" class="icon mini-icon search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" [(ngModel)]="historySearch" placeholder="Search by message or recipient email..." (input)="filterHistory()" class="premium-search-input">
+              <button *ngIf="historySearch" (click)="historySearch = ''; filterHistory()" class="clear-search">
+                <svg viewBox="0 0 24 24" class="icon mini-icon"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+
           <div class="premium-table-wrapper">
             <table class="premium-table">
               <thead>
@@ -126,6 +163,15 @@ import { NotificationService } from '../../core/services/notification.service';
                 </tr>
               </tbody>
             </table>
+          <div class="pagination-controls" *ngIf="historyTotalPages > 1">
+            <button type="button" (click)="changeHistoryPage(historyPage - 1)" [disabled]="historyPage === 0" class="page-btn">
+              <svg viewBox="0 0 24 24" class="icon tiny-icon"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="page-info">Matrix Segment {{historyPage + 1}} / {{historyTotalPages}}</span>
+            <button type="button" (click)="changeHistoryPage(historyPage + 1)" [disabled]="historyPage >= historyTotalPages - 1" class="page-btn">
+              <svg viewBox="0 0 24 24" class="icon tiny-icon"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
           </div>
         </div>
 
@@ -139,8 +185,8 @@ import { NotificationService } from '../../core/services/notification.service';
             <table class="premium-table">
               <thead>
                 <tr>
-                  <th>User Alias</th>
                   <th>Digital Address</th>
+                  <th>User Alias</th>
                   <th>Department</th>
                   <th>Security Level</th>
                   <th>Commands</th>
@@ -150,14 +196,14 @@ import { NotificationService } from '../../core/services/notification.service';
                 <tr *ngFor="let u of users" class="animate-row">
                   <td>
                     <div class="editable-cell" [class.editing]="editingId === u.id">
-                      <input *ngIf="editingId === u.id" [(ngModel)]="u.username" class="premium-input small">
-                      <span *ngIf="editingId !== u.id">&#64;{{u.username}}</span>
+                      <input *ngIf="editingId === u.id" [(ngModel)]="u.email" class="premium-input small">
+                      <span *ngIf="editingId !== u.id">{{u.email}}</span>
                     </div>
                   </td>
                   <td>
                     <div class="editable-cell" [class.editing]="editingId === u.id">
-                      <input *ngIf="editingId === u.id" [(ngModel)]="u.email" class="premium-input small">
-                      <span *ngIf="editingId !== u.id">{{u.email}}</span>
+                      <input *ngIf="editingId === u.id" [(ngModel)]="u.username" class="premium-input small">
+                      <span *ngIf="editingId !== u.id">&#64;{{u.username}}</span>
                     </div>
                   </td>
                   <td>
@@ -194,6 +240,15 @@ import { NotificationService } from '../../core/services/notification.service';
                 </tr>
               </tbody>
             </table>
+          <div class="pagination-controls" *ngIf="usersTotalPages > 1">
+            <button type="button" (click)="changeUsersPage(usersPage - 1)" [disabled]="usersPage === 0" class="page-btn">
+              <svg viewBox="0 0 24 24" class="icon tiny-icon"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="page-info">Data Fragment {{usersPage + 1}} / {{usersTotalPages}}</span>
+            <button type="button" (click)="changeUsersPage(usersPage + 1)" [disabled]="usersPage >= usersTotalPages - 1" class="page-btn">
+              <svg viewBox="0 0 24 24" class="icon tiny-icon"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
           </div>
         </div>
       </main>
@@ -236,16 +291,28 @@ import { NotificationService } from '../../core/services/notification.service';
     .admin-main > .glass-card { padding: 3rem; margin-bottom: 2rem; }
     .card-header { margin-bottom: 2.5rem; border-left: 4px solid var(--primary-red); padding-left: 1.5rem; }
     
-    .mode-selector { display: flex; gap: 0.5rem; background: rgba(255, 255, 255, 0.03); padding: 0.4rem; border-radius: 12px; margin-bottom: 0.5rem; border: 1px solid var(--glass-border); width: fit-content; }
-    .mode-selector button { padding: 0.6rem 1.2rem; border: none; background: transparent; color: var(--text-dim); border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.8rem; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.05em; }
+    .mode-selector { 
+      display: flex; 
+      gap: 0.5rem; 
+      background: rgba(255, 255, 255, 0.03); 
+      padding: 0.4rem; 
+      border-radius: 12px; 
+      margin: 0; 
+      border: 1px solid var(--glass-border); 
+      width: 100%; 
+      height: 3.5rem;
+      align-items: center;
+    }
+    .mode-selector button { flex: 1; height: 100%; padding: 0; border: none; background: transparent; color: var(--text-dim); border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.75rem; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.05em; }
     .mode-selector button.active { background: var(--primary-red); color: white; box-shadow: 0 4px 15px rgba(225, 29, 72, 0.4); }
     .mode-selector button:hover:not(.active) { background: rgba(255, 255, 255, 0.05); color: white; }
 
     h3 { font-size: 2.2rem; margin: 0 0 0.25rem 0; color: white; font-weight: 800; letter-spacing: -0.03em; }
     .card-subtitle { color: var(--text-dim); font-size: 0.95rem; margin: 0; font-weight: 500; opacity: 0.8; }
 
-    .form-row { display: flex; gap: 1.5rem; margin-bottom: 2rem; }
-    .flex-1 { flex: 1; }
+    .form-row { display: flex; gap: 1.5rem; margin-bottom: 2rem; align-items: flex-start; }
+    .flex-1 { flex: 1; min-width: 0; }
+    .hidden-v { visibility: hidden; pointer-events: none; }
     
     .status-box { padding: 1.25rem 1.5rem; border-radius: 14px; margin-bottom: 2rem; font-weight: 600; display: flex; align-items: center; gap: 1rem; font-size: 0.95rem; }
     .status-box.success { background: rgba(16, 185, 129, 0.05); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); }
@@ -293,11 +360,108 @@ import { NotificationService } from '../../core/services/notification.service';
     .delete-btn:hover { color: var(--primary-red); border-color: rgba(225, 29, 72, 0.3); }
     
     .premium-input.small { padding: 0.5rem 0.75rem; font-size: 0.85rem; width: 100%; min-width: 120px; }
+    .admin-main select.premium-input { height: 3.5rem; padding: 0 1rem; }
     .editable-cell input.premium-input { margin: -0.5rem 0; }
     .editable-cell.editing { min-width: 140px; }
 
     @keyframes rowIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .animate-row { animation: rowIn 0.5s ease-out forwards; }
+
+    /* Search & Multi-Tag Styles (Unified Vertical Stack) */
+    .search-tag-container { 
+      display: flex; 
+      flex-direction: column;
+      padding: 0 !important; 
+      height: 180px;
+      overflow: hidden;
+      border: 1px solid var(--glass-border-light);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    
+    .search-top-bar { 
+      display: flex; 
+      align-items: center; 
+      gap: 0.75rem; 
+      padding: 0.75rem 1rem; 
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      flex-shrink: 0;
+    }
+    
+    .search-icon-left { opacity: 0.4; width: 1.1rem; height: 1.1rem; }
+    .search-input { background: transparent; border: none; color: white; flex: 1; font-size: 0.95rem; outline: none; }
+    
+    .inline-results { 
+      max-height: 140px; 
+      overflow-y: auto; 
+      background: rgba(0, 0, 0, 0.3);
+      border-bottom: 1px solid var(--primary-red-muted);
+      flex-shrink: 0;
+    }
+    
+    .selected-tags-area { 
+      flex: 1; 
+      overflow-y: auto; 
+      padding: 1rem; 
+      display: flex; 
+      flex-wrap: wrap; 
+      gap: 0.6rem; 
+      align-content: flex-start;
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    .tags-placeholder { color: var(--text-dim); font-size: 0.85rem; opacity: 0.5; font-style: italic; width: 100%; text-align: center; margin-top: 1rem; }
+    .user-tag { background: rgba(225, 29, 72, 0.12); color: var(--primary-red); padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; border: 1px solid rgba(225, 29, 72, 0.2); }
+    .remove-tag { background: none; border: none; color: var(--primary-red); cursor: pointer; font-size: 1.2rem; padding: 0; line-height: 1; opacity: 0.6; }
+    
+    .search-item.mini-item { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 1rem; cursor: pointer; border-bottom: 1px solid rgba(255, 255, 255, 0.02); }
+    .search-item.mini-item:hover { background: rgba(225, 29, 72, 0.08); }
+    .add-icon { width: 1rem; height: 1rem; color: var(--primary-red); opacity: 0.6; }
+    
+    .item-info { display: flex; flex-direction: column; }
+    .page-info { color: white; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.05em; text-transform: uppercase; opacity: 0.7; }
+
+    .pagination-controls { 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      gap: 2rem; 
+      margin-top: 2rem; 
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--glass-border);
+    }
+    .page-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.03);
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+    .page-btn:hover:not(:disabled) { background: rgba(225, 29, 72, 0.1); border-color: var(--primary-red); color: var(--primary-red); }
+    .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* New Search Styles */
+    .search-box-container { padding: 0 1.5rem 1.5rem; }
+    .premium-search-bar { 
+      display: flex; 
+      align-items: center; 
+      gap: 1rem; 
+      background: rgba(255, 255, 255, 0.03); 
+      border: 1px solid var(--glass-border); 
+      border-radius: 12px; 
+      padding: 0.75rem 1.25rem;
+      transition: all 0.3s ease;
+    }
+    .premium-search-bar:focus-within { background: rgba(255, 255, 255, 0.05); border-color: var(--primary-red-muted); box-shadow: 0 0 15px rgba(225, 29, 72, 0.1); }
+    .premium-search-input { background: transparent; border: none; color: white; flex: 1; outline: none; font-size: 0.95rem; }
+    .clear-search { background: none; border: none; color: var(--text-dim); cursor: pointer; opacity: 0.6; transition: opacity 0.2s; }
+    .clear-search:hover { opacity: 1; color: var(--primary-red); }
   `]
 })
 export class AdminComponent {
@@ -306,6 +470,9 @@ export class AdminComponent {
   activeTab: 'send' | 'history' | 'users' = 'send';
   mode: 'ALL' | 'USER' | 'DEPARTMENT' = 'ALL';
   targetUsername = '';
+  selectedEmails: string[] = [];
+  userSearch = '';
+  filteredUsers: any[] = [];
   targetDepartment = '';
   notificationType = 'INFO';
   message = '';
@@ -314,11 +481,51 @@ export class AdminComponent {
   departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Operations', 'Finance', 'Legal'];
 
   history: any[] = [];
+  historyPage = 0;
+  historyTotalPages = 0;
+
   users: any[] = [];
+  usersPage = 0;
+  usersTotalPages = 0;
+  
+  allUsersForSearch: any[] = []; // Still used to store search results for UI
   editingId: number | null = null;
+  private searchSubject = new Subject<string>();
+  private historySearchSubject = new Subject<string>();
+  private searchSubscription?: Subscription;
+  private historySearchSubscription?: Subscription;
+
+  historySearch = '';
 
   ngOnInit() {
     this.loadData();
+    
+    // Optimized: Debounced server-side search instead of loading all users
+    this.searchSubscription = this.searchSubject.pipe(
+      debounceTime(150),
+      distinctUntilChanged(),
+      switchMap(query => {
+        if (!query) return of({ content: [] });
+        return this.notifService.searchUsers(query, 0, 10).pipe(
+          catchError(() => of({ content: [] }))
+        );
+      })
+    ).subscribe(data => {
+      this.filteredUsers = data.content;
+    });
+
+    this.historySearchSubscription = this.historySearchSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged()
+    ).subscribe(() => {
+      this.historyPage = 0;
+      this.loadData();
+    });
+  }
+
+  ngOnDestroy() {
+    this.searchSubscription?.unsubscribe();
+    this.historySearchSubscription?.unsubscribe();
   }
 
   setTab(tab: 'send' | 'history' | 'users') {
@@ -328,10 +535,47 @@ export class AdminComponent {
 
   loadData() {
     if (this.activeTab === 'history') {
-      this.notifService.getAllSentNotifications().subscribe(data => this.history = data);
+      this.notifService.getAllSentNotifications(this.historyPage, 10, this.historySearch).subscribe(data => {
+        this.history = data.content;
+        this.historyTotalPages = data.totalPages;
+      });
     } else if (this.activeTab === 'users') {
-      this.notifService.getUsers().subscribe(data => this.users = data);
+      this.notifService.getUsers(this.usersPage, 10).subscribe(data => {
+        this.users = data.content;
+        this.usersTotalPages = data.totalPages;
+      });
     }
+  }
+
+  changeHistoryPage(page: number) {
+    this.historyPage = page;
+    this.loadData();
+  }
+
+  changeUsersPage(page: number) {
+    this.usersPage = page;
+    this.loadData();
+  }
+
+  filterUsers() {
+    // Triggers the debounced search pipeline
+    this.searchSubject.next(this.userSearch);
+  }
+
+  filterHistory() {
+    this.historySearchSubject.next(this.historySearch);
+  }
+
+  addEmail(email: string) {
+    if (!this.selectedEmails.includes(email)) {
+      this.selectedEmails.push(email);
+    }
+    this.userSearch = '';
+    this.filteredUsers = [];
+  }
+
+  removeEmail(email: string) {
+    this.selectedEmails = this.selectedEmails.filter(e => e !== email);
   }
 
   sendNotification() {
@@ -341,13 +585,14 @@ export class AdminComponent {
     } else if (this.mode === 'DEPARTMENT') {
       obs = this.notifService.sendToDepartment(this.targetDepartment, this.message, this.notificationType);
     } else {
-      obs = this.notifService.sendToUser(this.targetUsername, this.message, this.notificationType);
+      obs = this.notifService.sendToDirectUsers(this.selectedEmails, this.message, this.notificationType);
     }
 
     obs.subscribe({
       next: () => {
         this.successMsg = 'Dispatched successfully!';
         this.message = '';
+        this.selectedEmails = [];
         setTimeout(() => this.successMsg = '', 3000);
       },
       error: () => alert('Failed to send notification.')

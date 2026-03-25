@@ -4,6 +4,12 @@ import { AuthService } from '../services/auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
+
+  // Avoid attaching bearer token to public auth endpoints to keep login/register unauthenticated
+  if (req.url.includes('/api/auth/')) {
+    return next(req);
+  }
+
   const token = authService.getToken();
 
   if (token) {

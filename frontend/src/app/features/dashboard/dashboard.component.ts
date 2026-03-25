@@ -59,6 +59,16 @@ import { NotificationService } from '../../core/services/notification.service';
             </div>
           }
         </div>
+
+        <div class="pagination-controls" *ngIf="totalPages > 1">
+          <button (click)="changePage(page - 1)" [disabled]="page === 0" class="page-btn">
+            <svg viewBox="0 0 24 24" class="icon tiny-icon"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span class="page-info">Matrix Segment {{page + 1}} / {{totalPages}}</span>
+          <button (click)="changePage(page + 1)" [disabled]="page >= totalPages - 1" class="page-btn">
+            <svg viewBox="0 0 24 24" class="icon tiny-icon"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   `,
@@ -144,10 +154,54 @@ import { NotificationService } from '../../core/services/notification.service';
     .xlarge-svg { width: 80px; height: 80px; margin-bottom: 2rem; color: var(--text-dim); opacity: 0.4; }
     .empty-state h3 { font-size: 1.6rem; margin: 0; color: white; }
     .empty-state p { color: var(--text-dim); margin-top: 0.75rem; font-weight: 500; }
+
+    .pagination-controls { 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      gap: 2rem; 
+      margin-top: 3rem; 
+      padding-top: 2rem;
+      border-top: 1px solid var(--glass-border);
+    }
+    .page-info { color: white; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.05em; text-transform: uppercase; opacity: 0.7; }
+    .page-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.03);
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+    .page-btn:hover:not(:disabled) { background: rgba(225, 29, 72, 0.1); border-color: var(--primary-red); color: var(--primary-red); }
+    .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
   `]
 })
 export class DashboardComponent {
   notifService = inject(NotificationService);
+  page = 0;
+  totalPages = 0;
+
+  ngOnInit() {
+    this.loadData();
+  }
+
+  loadData() {
+    this.notifService.getMyNotifications(this.page, 10).subscribe((data: any) => {
+      this.totalPages = data.totalPages;
+      this.notifService.notifications.set(data.content);
+    });
+  }
+
+  changePage(newPage: number) {
+    this.page = newPage;
+    this.loadData();
+  }
 
   markRead(id: number) {
     this.notifService.markAsRead(id);

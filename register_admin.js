@@ -3,7 +3,7 @@ const http = require('http');
 const data = JSON.stringify({
   username: 'admin_fix',
   email: 'admin@fix.com',
-  password: 'password',
+  password: 'admin123',
   role: 'ROLE_ADMIN',
   department: 'Engineering'
 });

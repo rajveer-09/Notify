@@ -45,7 +45,7 @@ import { AuthService } from '../../core/services/auth.service';
             <label>Digital Address</label>
             <div class="input-container">
               <svg viewBox="0 0 24 24" class="input-icon"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-              <input type="email" [(ngModel)]="email" name="email" required placeholder="primary@network.io" class="premium-input with-icon">
+              <input type="email" [(ngModel)]="email" name="email" required placeholder="email@address.com" class="premium-input with-icon">
             </div>
             <div class="error-text" *ngIf="email && !isValidEmail(email)">Invalid address format</div>
           </div>

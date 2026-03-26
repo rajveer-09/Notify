@@ -4,7 +4,15 @@ import { Observable, tap } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private apiUrl = 'http://localhost:8081/api/auth';
+  private getBaseUrl() {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      return `http://${hostname}:8081`;
+    }
+    return 'http://localhost:8081';
+  }
+
+  private apiUrl = `${this.getBaseUrl()}/api/auth`;
   
   currentUser = signal<{username: string, role: string, department?: string} | null>(null);
 

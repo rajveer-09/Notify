@@ -34,7 +34,7 @@ public class Notification {
     @PrePersist
     protected void onCreate() {
         if(createdAt == null) {
-            createdAt = LocalDateTime.now();
+            createdAt = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Kolkata"));
         }
     }
 

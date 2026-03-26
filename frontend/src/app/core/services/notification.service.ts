@@ -13,14 +13,26 @@ export interface PageResponse<T> {
 
 @Injectable({ providedIn: 'root' })
 export class NotificationService {
-  private apiUrl = 'http://localhost:8081/api/notifications';
-  private adminUrl = 'http://localhost:8081/api/admin/notifications';
+  private getBaseUrl() {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      return `http://${hostname}:8081`;
+    }
+    return 'http://localhost:8081';
+  }
+
+  private apiUrl = `${this.getBaseUrl()}/api/notifications`;
+  private adminUrl = `${this.getBaseUrl()}/api/admin/notifications`;
 
   notifications = signal<any[]>([]);
   unreadCount = signal<number>(0);
 
   constructor(private http: HttpClient, private wsService: WebsocketService) {
     this.wsService.notifications$.subscribe(notification => {
+      // Ensure specific global broadcast messages have a temporary ID for trackBy
+      if (!notification.id) {
+        notification.id = -Date.now(); // Use negative IDs for transient messages
+      }
       this.notifications.update(n => [notification, ...n]);
       this.unreadCount.update(c => c + 1);
     });
@@ -78,11 +90,11 @@ export class NotificationService {
       .set('page', page.toString())
       .set('size', size.toString())
       .set('sort', 'createdAt,desc');
-    
+
     if (query) {
       params = params.set('q', query);
     }
-    
+
     return this.http.get<PageResponse<any>>(`${this.adminUrl}/all`, { params });
   }
 
@@ -91,21 +103,21 @@ export class NotificationService {
       .set('q', query)
       .set('page', page.toString())
       .set('size', size.toString());
-    return this.http.get<PageResponse<any>>(`http://localhost:8081/api/admin/notifications/users/search`, { params });
+    return this.http.get<PageResponse<any>>(`http://localhost:8081/api/admin/users/search`, { params });
   }
 
   getUsers(page: number = 0, size: number = 10): Observable<PageResponse<any>> {
     const params = new HttpParams()
       .set('page', page.toString())
       .set('size', size.toString());
-    return this.http.get<PageResponse<any>>(`http://localhost:8081/api/admin/notifications/users`, { params });
+    return this.http.get<PageResponse<any>>(`${this.getBaseUrl()}/api/admin/users`, { params });
   }
 
   updateUser(id: number, user: any) {
-    return this.http.put(`http://localhost:8081/api/admin/notifications/users/${id}`, user, { responseType: 'text' });
+    return this.http.put(`${this.getBaseUrl()}/api/admin/users/${id}`, user, { responseType: 'text' });
   }
 
   deleteUser(id: number) {
-    return this.http.delete(`http://localhost:8081/api/admin/notifications/users/${id}`, { responseType: 'text' });
+    return this.http.delete(`${this.getBaseUrl()}/api/admin/users/${id}`, { responseType: 'text' });
   }
 }

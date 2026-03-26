@@ -4,19 +4,43 @@ application.yml
 *.properties
 *.yml
 
-# Build output
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Maven
 target/
-build/
-out/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# Node
+node_modules/
+dist/
+tmp/
+out-tsc/
+bazel-out/
+.angular/cache/
 
 # Logs
 *.log
 logs/
-
+backend.log
 
 # OS files
 .DS_Store
 Thumbs.db
+
+# VS Code
+.vscode/
+.history/
 
 # Temporary files
 *.tmp

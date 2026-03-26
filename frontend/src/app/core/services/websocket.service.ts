@@ -16,8 +16,10 @@ export class WebsocketService {
     if (!token) return;
 
     this.client = new Client({
-      // @ts-ignore
-      webSocketFactory: () => new SockJS('http://localhost:8081/ws'),
+      webSocketFactory: () => {
+        const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+        return new SockJS(`http://${hostname}:8081/ws`);
+      },
       connectHeaders: {
         Authorization: `Bearer ${token}`
       },
@@ -26,7 +28,16 @@ export class WebsocketService {
     });
 
     this.client.onConnect = () => {
+      // User-specific notifications
       this.client.subscribe(`/user/queue/notifications`, (message: Message) => {
+        if (message.body) {
+          const notification = JSON.parse(message.body);
+          this.notifications$.next(notification);
+        }
+      });
+
+      // Global broadcast notifications
+      this.client.subscribe(`/topic/global`, (message: Message) => {
         if (message.body) {
           const notification = JSON.parse(message.body);
           this.notifications$.next(notification);

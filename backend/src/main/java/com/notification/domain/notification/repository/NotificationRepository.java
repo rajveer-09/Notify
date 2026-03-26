@@ -26,4 +26,9 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     @EntityGraph(attributePaths = {"recipient"})
     Page<Notification> findByMessageContainingIgnoreCaseOrRecipientEmailContainingIgnoreCase(String message, String email, Pageable pageable);
+
+    @Modifying
+    @Query(value = "INSERT INTO notifications (message, type, recipient_id, is_read, created_at) " +
+                   "SELECT :message, :type, id, false, :createdAt FROM users", nativeQuery = true)
+    void insertGlobalNotification(@Param("message") String message, @Param("type") String type, @Param("createdAt") java.time.LocalDateTime createdAt);
 }

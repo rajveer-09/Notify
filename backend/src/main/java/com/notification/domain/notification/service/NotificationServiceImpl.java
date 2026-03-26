@@ -27,25 +27,36 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final AsyncNotificationService asyncNotificationService;
 
     public NotificationServiceImpl(NotificationRepository notificationRepository, UserRepository userRepository,
-                                   SimpMessagingTemplate messagingTemplate) {
+                                   SimpMessagingTemplate messagingTemplate, AsyncNotificationService asyncNotificationService) {
         this.notificationRepository = notificationRepository;
         this.userRepository = userRepository;
         this.messagingTemplate = messagingTemplate;
+        this.asyncNotificationService = asyncNotificationService;
     }
 
     @Override
     @Transactional
     @CacheEvict(value = {"unread_counts", "notif_history"}, allEntries = true)
     public void sendToAll(String messageText, NotificationType type) {
-        try {
-            log.info("Sending broadcast notification to all users: {}", messageText);
-            userRepository.findAll().forEach(u -> sendInternal(u, messageText, type));
-        } catch (Exception e) {
-            log.error("Failed to send broadcast notification", e);
-            throw e;
-        }
+        log.info("Broadcasting notification to all users: {}", messageText);
+        
+        // 1. WebSocket Broadcast to a common topic (Instant)
+        NotificationResponse broadcastMsg = NotificationResponse.builder()
+                .message(messageText)
+                .type(type)
+                .read(false)
+                .createdAt(java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Kolkata")))
+                .recipient(null) // Global message
+                .build();
+        messagingTemplate.convertAndSend("/topic/global", broadcastMsg);
+        
+        // 2. Background Archival (Async)
+        asyncNotificationService.saveGlobalNotificationBackground(messageText, type.name());
+        
+        log.info("Broadcast sent. Archival triggered in background.");
     }
 
     @Override
@@ -111,6 +122,13 @@ public class NotificationServiceImpl implements NotificationService {
     public long getUnreadCount(String email) {
         User u = userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException(email));
         return notificationRepository.countByRecipientAndReadFalse(u);
+    }
+
+    @Transactional(readOnly = true)
+    @Cacheable(value = "notif_history", key = "#recipient.id + '_' + #pageable.pageNumber")
+    public Page<NotificationResponse> getMyNotifications(User recipient, Pageable pageable) {
+        return notificationRepository.findByRecipient(recipient, pageable)
+                .map(NotificationMapper::toResponse);
     }
 
     @Override

@@ -148,7 +148,10 @@ import { NotificationService } from '../../core/services/notification.service';
                   <td class="user-cell">
                     <div class="user-info">
                       <svg viewBox="0 0 24 24" class="icon mini-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                      {{n.recipient.username}}
+                      <div class="user-detail">
+                        <div class="username">{{n.recipient.username}}</div>
+                        <div class="email">{{n.recipient.email}}</div>
+                      </div>
                     </div>
                   </td>
                   <td>
@@ -330,7 +333,10 @@ import { NotificationService } from '../../core/services/notification.service';
     .premium-table tr:hover { background: rgba(255, 255, 255, 0.02); }
 
     .time-cell { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--text-dim); font-weight: 600; }
-    .user-info { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; color: white; }
+    .user-info { display: flex; align-items: center; gap: 0.75rem; color: white; }
+    .user-detail { display: flex; flex-direction: column; gap: 0.1rem; }
+    .username { font-weight: 700; font-size: 0.95rem; }
+    .email { font-size: 0.75rem; color: var(--text-dim); font-weight: 500; font-family: 'JetBrains Mono', monospace; }
     .mini-icon { width: 18px; height: 18px; color: var(--primary-red); opacity: 0.8; }
     .msg-cell { line-height: 1.6; color: var(--text-main); max-width: 350px; font-weight: 450; }
     

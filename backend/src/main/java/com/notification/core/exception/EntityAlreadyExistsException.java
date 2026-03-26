@@ -1,9 +1,7 @@
 package com.notification.core.exception;
 
-import org.springframework.http.HttpStatus;
-
-public class EntityAlreadyExistsException extends BaseException {
+public class EntityAlreadyExistsException extends ConflictException {
     public EntityAlreadyExistsException(String message) {
-        super(message, HttpStatus.CONFLICT, "ALREADY_EXISTS");
+        super(message, "ALREADY_EXISTS");
     }
 }

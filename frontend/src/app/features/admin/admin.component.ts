@@ -184,6 +184,17 @@ import { NotificationService } from '../../core/services/notification.service';
             <h3>Entity Registry</h3>
             <p class="card-subtitle">Manage system users and access levels</p>
           </div>
+
+          <!-- User Search Bar -->
+          <div class="search-box-container animate-fade">
+            <div class="premium-search-bar">
+              <svg viewBox="0 0 24 24" class="icon mini-icon search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" [(ngModel)]="userListSearch" placeholder="Search by name or email..." (input)="filterUserList()" class="premium-search-input">
+              <button *ngIf="userListSearch" (click)="userListSearch = ''; filterUserList()" class="clear-search">
+                <svg viewBox="0 0 24 24" class="icon mini-icon"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
           <div class="premium-table-wrapper">
             <table class="premium-table">
               <thead>
@@ -493,13 +504,16 @@ export class AdminComponent {
   users: any[] = [];
   usersPage = 0;
   usersTotalPages = 0;
+  userListSearch = '';
   
   allUsersForSearch: any[] = []; // Still used to store search results for UI
   editingId: number | null = null;
   private searchSubject = new Subject<string>();
   private historySearchSubject = new Subject<string>();
+  private userListSearchSubject = new Subject<string>();
   private searchSubscription?: Subscription;
   private historySearchSubscription?: Subscription;
+  private userListSearchSubscription?: Subscription;
 
   historySearch = '';
 
@@ -527,11 +541,20 @@ export class AdminComponent {
       this.historyPage = 0;
       this.loadData();
     });
+
+    this.userListSearchSubscription = this.userListSearchSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged()
+    ).subscribe(() => {
+      this.usersPage = 0;
+      this.loadData();
+    });
   }
 
   ngOnDestroy() {
     this.searchSubscription?.unsubscribe();
     this.historySearchSubscription?.unsubscribe();
+    this.userListSearchSubscription?.unsubscribe();
   }
 
   setTab(tab: 'send' | 'history' | 'users') {
@@ -544,12 +567,32 @@ export class AdminComponent {
       this.notifService.getAllSentNotifications(this.historyPage, 10, this.historySearch).subscribe(data => {
         this.history = data.content;
         this.historyTotalPages = data.totalPages;
+        
+        // Pre-fetch next page
+        if (this.historyPage < this.historyTotalPages - 1) {
+          this.notifService.preFetchHistory(this.historyPage + 1, 10, this.historySearch);
+        }
       });
     } else if (this.activeTab === 'users') {
-      this.notifService.getUsers(this.usersPage, 10).subscribe(data => {
-        this.users = data.content;
-        this.usersTotalPages = data.totalPages;
-      });
+      if (this.userListSearch) {
+        this.notifService.searchUsers(this.userListSearch, this.usersPage, 10).subscribe(data => {
+          this.users = data.content;
+          this.usersTotalPages = data.totalPages;
+          
+          if (this.usersPage < this.usersTotalPages - 1) {
+            this.notifService.preFetchUsers(this.usersPage + 1, 10, this.userListSearch);
+          }
+        });
+      } else {
+        this.notifService.getUsers(this.usersPage, 10).subscribe(data => {
+          this.users = data.content;
+          this.usersTotalPages = data.totalPages;
+
+          if (this.usersPage < this.usersTotalPages - 1) {
+            this.notifService.preFetchUsers(this.usersPage + 1, 10);
+          }
+        });
+      }
     }
   }
 
@@ -572,6 +615,10 @@ export class AdminComponent {
     this.historySearchSubject.next(this.historySearch);
   }
 
+  filterUserList() {
+    this.userListSearchSubject.next(this.userListSearch);
+  }
+
   addEmail(email: string) {
     if (!this.selectedEmails.includes(email)) {
       this.selectedEmails.push(email);
@@ -585,6 +632,8 @@ export class AdminComponent {
   }
 
   sendNotification() {
+    this.successMsg = 'Initiating Transmission...';
+    
     let obs;
     if (this.mode === 'ALL') {
       obs = this.notifService.broadcast(this.message, this.notificationType);
@@ -599,9 +648,12 @@ export class AdminComponent {
         this.successMsg = 'Dispatched successfully!';
         this.message = '';
         this.selectedEmails = [];
-        setTimeout(() => this.successMsg = '', 3000);
+        setTimeout(() => this.successMsg = '', 2000);
       },
-      error: () => alert('Failed to send notification.')
+      error: (err) => {
+        this.successMsg = '';
+        alert('Failed to send notification: ' + (err.error?.message || 'Server error'));
+      }
     });
   }
 

@@ -4,11 +4,12 @@ import { CommonModule } from '@angular/common';
 import { AuthService } from './core/services/auth.service';
 import { NotificationService } from './core/services/notification.service';
 import { WebsocketService } from './core/services/websocket.service';
+import { ToastComponent } from './shared/components/toast/toast.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, CommonModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, CommonModule, ToastComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })

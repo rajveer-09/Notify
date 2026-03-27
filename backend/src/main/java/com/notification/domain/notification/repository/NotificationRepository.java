@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.EntityGraph;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
+    @EntityGraph(attributePaths = {"recipient"})
     Page<Notification> findByRecipient(User recipient, Pageable pageable);
     
     long countByRecipientAndReadFalse(User recipient);

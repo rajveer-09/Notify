@@ -111,6 +111,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    @Cacheable(value = "notif_history", key = "'user_' + #email + '_' + #pageable.pageNumber + '_' + #pageable.pageSize + '_' + #pageable.sort")
     public Page<NotificationResponse> getNotificationsForUser(String email, Pageable pageable) {
         User u = userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException(email));
         return notificationRepository.findByRecipient(u, pageable)
@@ -125,7 +126,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "notif_history", key = "#recipient.id + '_' + #pageable.pageNumber")
+    @Cacheable(value = "notif_history", key = "'user_' + #recipient.id + '_' + #pageable.pageNumber + '_' + #pageable.pageSize + '_' + #pageable.sort")
     public Page<NotificationResponse> getMyNotifications(User recipient, Pageable pageable) {
         return notificationRepository.findByRecipient(recipient, pageable)
                 .map(NotificationMapper::toResponse);
@@ -158,7 +159,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Cacheable(value = "notif_history", 
-               key = "#pageable.pageNumber + '-' + #pageable.pageSize", 
+               key = "'admin_' + (#query ?: 'all') + '_' + #pageable.pageNumber + '_' + #pageable.pageSize + '_' + #pageable.sort", 
                condition = "#query == null or #query.isEmpty()")
     public Page<NotificationResponse> getAllNotifications(String query, Pageable pageable) {
         log.info("Fetching notification history. Search Query: [{}], Page: {}", query, pageable.getPageNumber());

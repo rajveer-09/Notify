@@ -1,6 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { NotificationService } from '../../core/services/notification.service';
+import { Subscription } from 'rxjs';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'app-dashboard',
@@ -13,7 +15,7 @@ import { NotificationService } from '../../core/services/notification.service';
           <h1 class="page-title">Operational Feed</h1>
           <p class="page-subtitle">Monitoring real-time network transmissions</p>
         </div>
-        <button class="btn btn-secondary" *ngIf="notifService.unreadCount() > 0" (click)="markAllRead()">
+        <button class="btn btn-secondary" *ngIf="notifService.unreadCount() > 0 && page === 0" (click)="markAllRead()">
           <svg viewBox="0 0 24 24" class="icon btn-icon"><polyline points="20 6 9 17 4 12"/></svg>
           Mark Synchronized
         </button>
@@ -35,7 +37,9 @@ import { NotificationService } from '../../core/services/notification.service';
         
         <div class="notif-list">
           @for (n of notifService.notifications(); track n.id) {
-            <div class="notif-entry glass-card shadow-lg" [class.unread]="!n.read">
+            <div class="notif-entry glass-card shadow-lg" 
+                 [class.unread]="!n.read"
+                 [class.marking-read]="markingReadIds.has(n.id)">
               <div class="entry-header">
                 <div class="type-indicator" [ngClass]="n.type">
                   <svg *ngIf="n.type === 'INFO'" viewBox="0 0 24 24" class="icon mini-icon"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -49,7 +53,7 @@ import { NotificationService } from '../../core/services/notification.service';
               <div class="entry-body">
                 <p class="content">{{n.message}}</p>
               </div>
-
+              
               <div class="entry-footer" *ngIf="!n.read">
                 <button class="dismiss-btn" (click)="markRead(n.id)">
                   Acknowledge
@@ -59,7 +63,7 @@ import { NotificationService } from '../../core/services/notification.service';
             </div>
           }
         </div>
-
+        
         <div class="pagination-controls" *ngIf="totalPages > 1">
           <button (click)="changePage(page - 1)" [disabled]="page === 0" class="page-btn">
             <svg viewBox="0 0 24 24" class="icon tiny-icon"><polyline points="15 18 9 12 15 6"/></svg>
@@ -180,21 +184,59 @@ import { NotificationService } from '../../core/services/notification.service';
     }
     .page-btn:hover:not(:disabled) { background: rgba(225, 29, 72, 0.1); border-color: var(--primary-red); color: var(--primary-red); }
     .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .notif-entry.marking-read {
+      animation: acknowledgePulse 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      pointer-events: none;
+    }
+
+    @keyframes acknowledgePulse {
+      0% { transform: scale(1); opacity: 1; border-left-color: var(--primary-red); }
+      30% { transform: scale(0.98); opacity: 0.8; background: rgba(244, 63, 94, 0.1); }
+      100% { transform: scale(1); opacity: 0.7; border-left-color: transparent; }
+    }
   `]
 })
-export class DashboardComponent {
+export class DashboardComponent implements OnInit, OnDestroy {
   notifService = inject(NotificationService);
   page = 0;
   totalPages = 0;
+  markingReadIds = new Set<number>();
+  private newNotifSub?: Subscription;
+  private routeSub?: Subscription;
+  private route = inject(ActivatedRoute);
 
   ngOnInit() {
     this.loadData();
+    
+    this.routeSub = this.route.queryParams.subscribe(params => {
+      if (params['refresh']) {
+        this.page = 0;
+        this.loadData();
+      }
+    });
+
+    this.newNotifSub = this.notifService.newNotification$.subscribe(notification => {
+      if (this.page === 0) {
+        this.notifService.notifications.update(n => [notification, ...n]);
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    this.newNotifSub?.unsubscribe();
+    this.routeSub?.unsubscribe();
   }
 
   loadData() {
     this.notifService.getMyNotifications(this.page, 10).subscribe((data: any) => {
       this.totalPages = data.totalPages;
       this.notifService.notifications.set(data.content);
+      
+      // Pre-fetch next page if it exists
+      if (this.page < this.totalPages - 1) {
+        this.notifService.preFetchMyNotifications(this.page + 1, 10);
+      }
     });
   }
 
@@ -204,7 +246,11 @@ export class DashboardComponent {
   }
 
   markRead(id: number) {
-    this.notifService.markAsRead(id);
+    this.markingReadIds.add(id);
+    setTimeout(() => {
+      this.notifService.markAsRead(id);
+      setTimeout(() => this.markingReadIds.delete(id), 1000); // Allow animation to finish
+    }, 300); // Small initial delay for animation feedback
   }
 
   markAllRead() {

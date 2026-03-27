@@ -8,6 +8,7 @@ import jakarta.persistence.*;
     @Index(name = "idx_user_username", columnList = "username"),
     @Index(name = "idx_user_email", columnList = "email")
 })
+@org.hibernate.annotations.BatchSize(size = 10)
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

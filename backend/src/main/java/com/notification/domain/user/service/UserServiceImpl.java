@@ -25,6 +25,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Cacheable(value = "users", key = "'search_' + #query + '_' + #pageable.pageNumber + '_' + #pageable.pageSize")
     public Page<UserResponse> searchUsers(String query, Pageable pageable) {
         log.debug("Searching users with query: {}", query);
         return userRepository.findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(query, query, pageable)
@@ -32,7 +33,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @Cacheable(value = "users", key = "#pageable != null ? #pageable.pageNumber + '-' + #pageable.pageSize : 'default'")
+    @Cacheable(value = "users", key = "'all_' + #pageable.pageNumber + '_' + #pageable.pageSize")
     public Page<UserResponse> getAllUsers(Pageable pageable) {
         log.debug("Fetching all users, page: {}", pageable.getPageNumber());
         return userRepository.findAll(pageable)

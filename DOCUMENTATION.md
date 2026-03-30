@@ -7,7 +7,8 @@ This document provides a comprehensive technical deep-dive into the "Notifiy" sy
 ## 🚀 Major Features & Capabilities
 
 1.  **Real-Time Tactical Feed**: Instant delivery of notifications using STOMP over WebSockets.
-2.  **Multi-Tier Targeting**: Support for Global (Broadcast), Departmental (Segmented), and Individual (Direct) messaging.
+2.  **Integrated Feedback Discovery**: Real-time search and filtering on the main dashboard to quickly locate specific transmissions.
+3.  **Multi-Tier Targeting**: Support for Global (Broadcast), Departmental (Segmented), and Individual (Direct) messaging.
 3.  **Advanced Administrative Control**: Real-time user management, message history tracking, and global search.
 4.  **Zero-Latency UX**: Instant page transitions and optimistic feedback for all critical actions.
 5.  **Role-Based Security (RBAC)**: Strict access control using JWT and Spring Security filters.

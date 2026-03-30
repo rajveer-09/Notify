@@ -1,6 +1,7 @@
 package com.notification.domain.notification.controller;
 
 import com.notification.domain.notification.dto.NotificationResponse;
+import com.notification.domain.notification.dto.MarkReadRequest;
 import com.notification.domain.notification.service.NotificationService;
 
 import org.springframework.data.domain.Page;
@@ -24,8 +25,9 @@ public class NotificationController {
     @GetMapping
     public ResponseEntity<Page<NotificationResponse>> getMyNotifications(
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @RequestParam(value = "q", required = false) String query,
             Authentication authentication) {
-        return ResponseEntity.ok(notificationService.getNotificationsForUser(authentication.getName(), pageable));
+        return ResponseEntity.ok(notificationService.getNotificationsForUser(authentication.getName(), query, pageable));
     }
 
     @GetMapping("/unread-count")
@@ -34,14 +36,20 @@ public class NotificationController {
     }
 
     @PutMapping("/{id}/read")
-    public ResponseEntity<Void> markAsRead(@PathVariable("id") Long id, Authentication authentication) {
-        notificationService.markAsRead(id, authentication.getName());
-        return ResponseEntity.ok().build();
+    public ResponseEntity<Long> markAsRead(@PathVariable("id") Long id, Authentication authentication) {
+        return ResponseEntity.ok(notificationService.markAsRead(id, authentication.getName()));
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NotificationController.class);
+
+    @PutMapping("/mark-read")
+    public ResponseEntity<Long> markAsRead(@RequestBody MarkReadRequest request, Authentication authentication) {
+        log.info("Marking as read: id={}, message={} for user={}", request.getId(), request.getMessage(), authentication.getName());
+        return ResponseEntity.ok(notificationService.markAsRead(request, authentication.getName()));
     }
 
     @PutMapping("/read-all")
-    public ResponseEntity<Void> markAllAsRead(Authentication authentication) {
-        notificationService.markAllAsRead(authentication.getName());
-        return ResponseEntity.ok().build();
+    public ResponseEntity<Long> markAllAsRead(Authentication authentication) {
+        return ResponseEntity.ok(notificationService.markAllAsRead(authentication.getName()));
     }
 }

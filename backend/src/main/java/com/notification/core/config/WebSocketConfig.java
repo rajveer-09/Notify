@@ -1,7 +1,6 @@
 package com.notification.core.config;
 
 import com.notification.core.security.JwtUtil;
-import com.notification.domain.auth.exception.AuthException;
 import io.jsonwebtoken.Claims;
 
 import org.springframework.context.annotation.Configuration;
@@ -72,21 +71,21 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         String role = jwtUtil.extractClaim(token, (Claims claims) -> claims.get("role", String.class));
                         
                         if (username != null) {
+                            String finalRole = role != null ? (role.startsWith("ROLE_") ? role : "ROLE_" + role) : "ROLE_USER";
                             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                                     username, 
                                     null, 
-                                    Collections.singletonList(new SimpleGrantedAuthority(role != null ? role : "ROLE_USER"))
+                                    Collections.singletonList(new SimpleGrantedAuthority(finalRole))
                             );
                             accessor.setUser(auth);
-                            log.debug("WebSocket connected: user={} | role={}", username, role);
+                            log.info("WebSocket connected: user={} | role={}", username, finalRole);
                         }
                     } catch (Exception e) {
                         log.error("WebSocket Authentication failed: {}", e.getMessage());
-                        throw new AuthException("Invalid WebSocket authentication token");
+                        // Don't throw here to avoid dropping the whole connection immediately, let security decide later
                     }
                 } else {
-                    log.warn("WebSocket connection attempt without Authorization header");
-                    throw new AuthException("Missing WebSocket authentication token");
+                    log.warn("WebSocket connection attempt without Authorization header. Path: {}", accessor.getDestination());
                 }
             }
             return message;

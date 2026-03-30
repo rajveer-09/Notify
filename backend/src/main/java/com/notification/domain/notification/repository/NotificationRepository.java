@@ -14,8 +14,14 @@ import org.springframework.data.jpa.repository.EntityGraph;
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
     @EntityGraph(attributePaths = {"recipient"})
     Page<Notification> findByRecipient(User recipient, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"recipient"})
+    @Query("SELECT n FROM Notification n WHERE n.recipient = :recipient AND n.message LIKE CONCAT('%', :q, '%')")
+    Page<Notification> searchNotificationsByKeyword(@Param("recipient") User recipient, @Param("q") String q, Pageable pageable);
     
     long countByRecipientAndReadFalse(User recipient);
+    
+    java.util.Optional<Notification> findFirstByRecipientAndMessageAndReadFalseOrderByCreatedAtDesc(User recipient, String message);
     
     @Modifying
     @Query("UPDATE Notification n SET n.read = true WHERE n.recipient = :recipient")

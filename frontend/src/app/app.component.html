@@ -1,5 +1,5 @@
 <nav class="navbar animate-fade" *ngIf="isLoggedIn()">
-  <div class="nav-brand" routerLink="/dashboard">
+  <div class="nav-brand" routerLink="/dashboard" [queryParams]="{refresh: true}">
     <div class="logo-symbol">
       <svg viewBox="0 0 24 24" class="icon logo-svg">
         <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
@@ -10,7 +10,7 @@
   
   <div class="nav-links">
     <div class="main-nav">
-      <a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+      <a routerLink="/dashboard" [queryParams]="{refresh: true}" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
         <span>Insights</span>
       </a>
       <a *ngIf="isAdmin()" routerLink="/admin" routerLinkActive="active">

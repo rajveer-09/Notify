@@ -28,7 +28,7 @@ public class UserServiceImpl implements UserService {
     @Cacheable(value = "users", key = "'search_' + #query + '_' + #pageable.pageNumber + '_' + #pageable.pageSize")
     public Page<UserResponse> searchUsers(String query, Pageable pageable) {
         log.debug("Searching users with query: {}", query);
-        return userRepository.findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(query, query, pageable)
+        return userRepository.findByUsernameStartingWithIgnoreCaseOrEmailStartingWithIgnoreCase(query, query, pageable)
                 .map(UserMapper::toResponse);
     }
 

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, untracked } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, of, Subscription } from 'rxjs';
@@ -120,18 +120,24 @@ import { NotificationService } from '../../core/services/notification.service';
             <p class="card-subtitle">View all previous system communications</p>
           </div>
           
-          <!-- History Search Bar -->
-          <div class="search-box-container animate-fade">
-            <div class="premium-search-bar">
-              <svg viewBox="0 0 24 24" class="icon mini-icon search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="text" [(ngModel)]="historySearch" placeholder="Search by message or recipient email..." (input)="filterHistory()" class="premium-search-input">
-              <button *ngIf="historySearch" (click)="historySearch = ''; filterHistory()" class="clear-search">
-                <svg viewBox="0 0 24 24" class="icon mini-icon"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
+          <div class="relative-container">
+            <div *ngIf="loading()" class="admin-loader-container animate-fade">
+              <div class="spinner-admin"></div>
+              <p>Syncing archives...</p>
             </div>
-          </div>
 
-          <div class="premium-table-wrapper">
+            <!-- History Search Bar -->
+            <div class="search-box-container animate-fade" [class.blurred]="loading()">
+              <div class="premium-search-bar">
+                <svg viewBox="0 0 24 24" class="icon mini-icon search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" [(ngModel)]="historySearch" placeholder="Search by message or recipient email..." (input)="filterHistory()" class="premium-search-input">
+                <button *ngIf="historySearch" (click)="historySearch = ''; filterHistory()" class="clear-search">
+                  <svg viewBox="0 0 24 24" class="icon mini-icon"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="premium-table-wrapper" [class.blurred]="loading()">
             <table class="premium-table">
               <thead>
                 <tr>
@@ -176,6 +182,7 @@ import { NotificationService } from '../../core/services/notification.service';
             </button>
           </div>
           </div>
+          </div>
         </div>
 
         <!-- Users Tab -->
@@ -185,17 +192,24 @@ import { NotificationService } from '../../core/services/notification.service';
             <p class="card-subtitle">Manage system users and access levels</p>
           </div>
 
-          <!-- User Search Bar -->
-          <div class="search-box-container animate-fade">
-            <div class="premium-search-bar">
-              <svg viewBox="0 0 24 24" class="icon mini-icon search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="text" [(ngModel)]="userListSearch" placeholder="Search by name or email..." (input)="filterUserList()" class="premium-search-input">
-              <button *ngIf="userListSearch" (click)="userListSearch = ''; filterUserList()" class="clear-search">
-                <svg viewBox="0 0 24 24" class="icon mini-icon"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
+          <div class="relative-container">
+            <div *ngIf="loading()" class="admin-loader-container animate-fade">
+              <div class="spinner-admin"></div>
+              <p>Syncing entity records...</p>
             </div>
-          </div>
-          <div class="premium-table-wrapper">
+
+            <!-- User Search Bar -->
+            <div class="search-box-container animate-fade" [class.blurred]="loading()">
+              <div class="premium-search-bar">
+                <svg viewBox="0 0 24 24" class="icon mini-icon search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" [(ngModel)]="userListSearch" placeholder="Search by name or email..." (input)="filterUserList()" class="premium-search-input">
+                <button *ngIf="userListSearch" (click)="userListSearch = ''; filterUserList()" class="clear-search">
+                  <svg viewBox="0 0 24 24" class="icon mini-icon"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+            
+            <div class="premium-table-wrapper" [class.blurred]="loading()">
             <table class="premium-table">
               <thead>
                 <tr>
@@ -262,6 +276,7 @@ import { NotificationService } from '../../core/services/notification.service';
             <button type="button" (click)="changeUsersPage(usersPage + 1)" [disabled]="usersPage >= usersTotalPages - 1" class="page-btn">
               <svg viewBox="0 0 24 24" class="icon tiny-icon"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
+          </div>
           </div>
           </div>
         </div>
@@ -437,6 +452,40 @@ import { NotificationService } from '../../core/services/notification.service';
     
     .item-info { display: flex; flex-direction: column; }
     .page-info { color: white; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.05em; text-transform: uppercase; opacity: 0.7; }
+    
+    .admin-loader-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(2px);
+      z-index: 10;
+      color: var(--primary-red);
+      gap: 1rem;
+      border-radius: 12px;
+    }
+    .spinner-admin {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(225, 29, 72, 0.1);
+      border-top-color: var(--primary-red);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .blurred { 
+      filter: blur(1.5px) grayscale(0.2);
+      pointer-events: none;
+      opacity: 0.7;
+      transition: all 0.3s ease;
+    }
+    .relative-container { position: relative; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     .pagination-controls { 
       display: flex; 
@@ -483,6 +532,8 @@ import { NotificationService } from '../../core/services/notification.service';
 })
 export class AdminComponent {
   notifService = inject(NotificationService);
+  loading = signal<boolean>(false);
+  private currentLoaderTimer?: any;
   
   activeTab: 'send' | 'history' | 'users' = 'send';
   mode: 'ALL' | 'USER' | 'DEPARTMENT' = 'ALL';
@@ -519,10 +570,12 @@ export class AdminComponent {
 
   ngOnInit() {
     this.loadData();
+    // Proactive pre-fetch for the direct message search
+    this.notifService.getUsers(0, 10).subscribe();
     
     // Optimized: Debounced server-side search instead of loading all users
     this.searchSubscription = this.searchSubject.pipe(
-      debounceTime(150),
+      debounceTime(100),
       distinctUntilChanged(),
       switchMap(query => {
         if (!query) return of({ content: [] });
@@ -561,38 +614,51 @@ export class AdminComponent {
     this.activeTab = tab;
     this.loadData();
   }
-
   loadData() {
+    if (this.currentLoaderTimer) clearTimeout(this.currentLoaderTimer);
+    
+    this.currentLoaderTimer = setTimeout(() => this.loading.set(true), 80);
+
     if (this.activeTab === 'history') {
-      this.notifService.getAllSentNotifications(this.historyPage, 10, this.historySearch).subscribe(data => {
-        this.history = data.content;
-        this.historyTotalPages = data.totalPages;
-        
-        // Pre-fetch next page
-        if (this.historyPage < this.historyTotalPages - 1) {
-          this.notifService.preFetchHistory(this.historyPage + 1, 10, this.historySearch);
+      this.notifService.getAllSentNotifications(this.historyPage, 10, this.historySearch).subscribe({
+        next: (data) => {
+          if (this.currentLoaderTimer) clearTimeout(this.currentLoaderTimer);
+          this.history = data.content;
+          this.historyTotalPages = data.totalPages;
+          
+          // Look-ahead: Pre-fetch next 3 pages
+          if (this.historyPage < this.historyTotalPages - 1) {
+            this.notifService.preFetchHistory(this.historyPage + 1, 10, this.historySearch, 3);
+          }
+          this.loading.set(false);
+        },
+        error: () => {
+          if (this.currentLoaderTimer) clearTimeout(this.currentLoaderTimer);
+          this.loading.set(false);
         }
       });
     } else if (this.activeTab === 'users') {
-      if (this.userListSearch) {
-        this.notifService.searchUsers(this.userListSearch, this.usersPage, 10).subscribe(data => {
+      const obs = this.userListSearch 
+        ? this.notifService.searchUsers(this.userListSearch, this.usersPage, 10)
+        : this.notifService.getUsers(this.usersPage, 10);
+        
+      obs.subscribe({
+        next: (data) => {
+          if (this.currentLoaderTimer) clearTimeout(this.currentLoaderTimer);
           this.users = data.content;
           this.usersTotalPages = data.totalPages;
           
+          // Look-ahead: Pre-fetch next 3 pages
           if (this.usersPage < this.usersTotalPages - 1) {
-            this.notifService.preFetchUsers(this.usersPage + 1, 10, this.userListSearch);
+            this.notifService.preFetchUsers(this.usersPage + 1, 10, this.userListSearch || undefined, 3);
           }
-        });
-      } else {
-        this.notifService.getUsers(this.usersPage, 10).subscribe(data => {
-          this.users = data.content;
-          this.usersTotalPages = data.totalPages;
-
-          if (this.usersPage < this.usersTotalPages - 1) {
-            this.notifService.preFetchUsers(this.usersPage + 1, 10);
-          }
-        });
-      }
+          this.loading.set(false);
+        },
+        error: () => {
+          if (this.currentLoaderTimer) clearTimeout(this.currentLoaderTimer);
+          this.loading.set(false);
+        }
+      });
     }
   }
 
@@ -624,6 +690,7 @@ export class AdminComponent {
       this.selectedEmails.push(email);
     }
     this.userSearch = '';
+    this.searchSubject.next('');
     this.filteredUsers = [];
   }
 

@@ -97,14 +97,9 @@ public class DebugController {
     @DeleteMapping("/clear")
     public ResponseEntity<String> clearTestData() {
         // Only clear test users and their notifications
-        List<User> testUsers = userRepository.findAll().stream()
-                .filter(u -> u.getEmail().contains("@example"))
-                .toList();
         
-        for(User u : testUsers) {
-            // Notifications were already cascading or handle manually if needed
-            // Actually, JPA should handle if mapped correctly, but let's be safe
-        }
+        // Notifications were already cascading or handle manually if needed
+        // Actually, JPA should handle if mapped correctly, but let's be safe
         
         // This is a debug tool, so we can be a bit more direct if needed
         // For now, it's safer to just let the user know this is a manual process or implement it fully

@@ -23,6 +23,7 @@ D:\OneDrive - PeopleStrong\Desktop\Notifiy\backend\src\main\java\com\notificatio
 D:\OneDrive - PeopleStrong\Desktop\Notifiy\backend\src\main\java\com\notification\domain\debug\controller\DebugController.java
 D:\OneDrive - PeopleStrong\Desktop\Notifiy\backend\src\main\java\com\notification\domain\notification\controller\AdminNotificationController.java
 D:\OneDrive - PeopleStrong\Desktop\Notifiy\backend\src\main\java\com\notification\domain\notification\controller\NotificationController.java
+D:\OneDrive - PeopleStrong\Desktop\Notifiy\backend\src\main\java\com\notification\domain\notification\dto\MarkReadRequest.java
 D:\OneDrive - PeopleStrong\Desktop\Notifiy\backend\src\main\java\com\notification\domain\notification\dto\NotificationRequest.java
 D:\OneDrive - PeopleStrong\Desktop\Notifiy\backend\src\main\java\com\notification\domain\notification\dto\NotificationResponse.java
 D:\OneDrive - PeopleStrong\Desktop\Notifiy\backend\src\main\java\com\notification\domain\notification\entity\Notification.java

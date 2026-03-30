@@ -1,28 +1,51 @@
-import { Component, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, untracked } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { NotificationService } from '../../core/services/notification.service';
-import { Subscription } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { Subject, Subscription } from 'rxjs';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, DatePipe],
+  imports: [CommonModule, DatePipe, FormsModule],
   template: `
     <div class="dashboard-wrapper animate-fade">
       <div class="dashboard-header">
-        <div class="header-content">
-          <h1 class="page-title">Operational Feed</h1>
-          <p class="page-subtitle">Monitoring real-time network transmissions</p>
+        <div class="header-left">
+          <div class="header-content">
+            <h1 class="page-title">Operational Feed</h1>
+            <p class="page-subtitle">Monitoring real-time network transmissions</p>
+          </div>
+          
+          <!-- New Search Bar -->
+          <div class="dash-search-container animate-fade">
+            <div class="dash-search-bar">
+              <svg viewBox="0 0 24 24" class="icon mini-icon search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" [ngModel]="searchQuery" (ngModelChange)="onSearchChange($event)" placeholder="Filter transmissions..." class="dash-search-input">
+              <button class="search-confirm-btn" (click)="loadData()" title="Apply Filter">
+                <svg viewBox="0 0 24 24" class="icon tiny-icon"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+              <button *ngIf="searchQuery" (click)="clearSearch()" class="clear-search" title="Clear Filter">
+                <svg viewBox="0 0 24 24" class="icon tiny-icon"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
         </div>
-        <button class="btn btn-secondary" *ngIf="notifService.unreadCount() > 0 && page === 0" (click)="markAllRead()">
+
+        <button class="btn btn-secondary" *ngIf="notifService.unreadCount() > 0 && page === 0 && !searchQuery" (click)="markAllRead()">
           <svg viewBox="0 0 24 24" class="icon btn-icon"><polyline points="20 6 9 17 4 12"/></svg>
           Mark Synchronized
         </button>
       </div>
       
       <div class="feed-container">
-        @if (notifService.notifications().length === 0) {
+        <div *ngIf="loading()" class="loading-overlay animate-fade">
+          <div class="spinner"></div>
+          <span>Synchronizing Feed...</span>
+        </div>
+        @if (!loading() && notifService.notifications().length === 0) {
           <div class="empty-state glass-card">
             <div class="empty-visual">
               <svg viewBox="0 0 24 24" class="icon xlarge-svg">
@@ -55,7 +78,7 @@ import { ActivatedRoute } from '@angular/router';
               </div>
               
               <div class="entry-footer" *ngIf="!n.read">
-                <button class="dismiss-btn" (click)="markRead(n.id)">
+                <button class="dismiss-btn" (click)="markRead(n.id, n.message)">
                   Acknowledge
                   <svg viewBox="0 0 24 24" class="icon tiny-icon"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
@@ -64,12 +87,12 @@ import { ActivatedRoute } from '@angular/router';
           }
         </div>
         
-        <div class="pagination-controls" *ngIf="totalPages > 1">
+        <div class="pagination-controls" *ngIf="notifService.totalPages() > 1">
           <button (click)="changePage(page - 1)" [disabled]="page === 0" class="page-btn">
             <svg viewBox="0 0 24 24" class="icon tiny-icon"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          <span class="page-info">Matrix Segment {{page + 1}} / {{totalPages}}</span>
-          <button (click)="changePage(page + 1)" [disabled]="page >= totalPages - 1" class="page-btn">
+          <span class="page-info">Matrix Segment {{page + 1}} / {{notifService.totalPages()}}</span>
+          <button (click)="changePage(page + 1)" [disabled]="page >= notifService.totalPages() - 1" class="page-btn">
             <svg viewBox="0 0 24 24" class="icon tiny-icon"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
@@ -195,30 +218,89 @@ import { ActivatedRoute } from '@angular/router';
       30% { transform: scale(0.98); opacity: 0.8; background: rgba(244, 63, 94, 0.1); }
       100% { transform: scale(1); opacity: 0.7; border-left-color: transparent; }
     }
+
+    .dashboard-header { align-items: center; gap: 2rem; }
+    .header-left { display: flex; align-items: center; gap: 3rem; flex: 1; }
+    
+    .dash-search-container { flex: 1; max-width: 400px; }
+    .dash-search-bar { 
+      display: flex; 
+      align-items: center; 
+      gap: 0.75rem; 
+      background: rgba(255, 255, 255, 0.03); 
+      border: 1px solid var(--glass-border); 
+      border-radius: 12px; 
+      padding: 0.6rem 1rem;
+      transition: all 0.3s ease;
+    }
+    .dash-search-bar:focus-within { background: rgba(255, 255, 255, 0.05); border-color: rgba(225, 29, 72, 0.3); box-shadow: 0 0 15px rgba(225, 29, 72, 0.1); }
+    .dash-search-input { background: transparent; border: none; color: white; flex: 1; outline: none; font-size: 0.9rem; }
+    .clear-search { background: none; border: none; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; padding: 0; opacity: 0.6; }
+    .clear-search:hover { opacity: 1; color: var(--primary-red); }
+    .notif-list { display: grid; gap: 1.25rem; min-height: 200px; }
+    
+    .loading-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.85); /* Slightly darker for contrast */
+      backdrop-filter: blur(8px);
+      z-index: 1000; /* Higher z-index */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      border-radius: 20px;
+      min-height: 300px;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(225, 29, 72, 0.1);
+      border-top-color: var(--primary-red);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .search-confirm-btn { background: none; border: none; color: var(--primary-red); cursor: pointer; display: flex; align-items: center; padding: 0; opacity: 0.8; }
+    .search-confirm-btn:hover { opacity: 1; transform: scale(1.2); }
   `]
 })
 export class DashboardComponent implements OnInit, OnDestroy {
   notifService = inject(NotificationService);
-  page = 0;
-  totalPages = 0;
+  page: number = 0;
+  loading = signal<boolean>(false);
   markingReadIds = new Set<number>();
+  searchQuery = '';
+  private searchSubject = new Subject<string>();
   private newNotifSub?: Subscription;
   private routeSub?: Subscription;
+  private searchSub?: Subscription;
   private route = inject(ActivatedRoute);
 
   ngOnInit() {
     this.loadData();
     
-    this.routeSub = this.route.queryParams.subscribe(params => {
+    this.routeSub = this.route.queryParams.subscribe((params: any) => {
       if (params['refresh']) {
+        console.log('Force synchronizing dashboard state...');
         this.page = 0;
-        this.loadData();
+        this.searchQuery = '';
+        this.notifService.forceRefresh();
       }
     });
 
-    this.newNotifSub = this.notifService.newNotification$.subscribe(notification => {
-      if (this.page === 0) {
-        this.notifService.notifications.update(n => [notification, ...n]);
+    this.searchSub = this.searchSubject.pipe(
+      debounceTime(200),
+      distinctUntilChanged()
+    ).subscribe(() => {
+      this.page = 0;
+      this.loadData();
+    });
+
+    this.newNotifSub = this.notifService.newNotification$.subscribe((notification: any) => {
+      if (this.page === 0 && !this.searchQuery) {
+        this.notifService.notifications.update((n: any[]) => [notification, ...n]);
       }
     });
   }
@@ -226,18 +308,47 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.newNotifSub?.unsubscribe();
     this.routeSub?.unsubscribe();
+    this.searchSub?.unsubscribe();
   }
 
   loadData() {
-    this.notifService.getMyNotifications(this.page, 10).subscribe((data: any) => {
-      this.totalPages = data.totalPages;
-      this.notifService.notifications.set(data.content);
-      
-      // Pre-fetch next page if it exists
-      if (this.page < this.totalPages - 1) {
-        this.notifService.preFetchMyNotifications(this.page + 1, 10);
+    if (this.loading()) return;
+    const q = this.searchQuery?.trim() || '';
+    
+    this.loading.set(true);
+
+    this.notifService.getMyNotifications(this.page, 10, q).subscribe({
+      next: (data: any) => {
+        untracked(() => {
+          this.notifService.totalPages.set(data.totalPages);
+          this.notifService.notifications.set(data.content);
+          this.notifService.refreshUnreadCount();
+        });
+        this.loading.set(false);
+        
+        // Look-ahead: Pre-fetch next 3 pages
+        if (this.page < this.notifService.totalPages() - 1) {
+          this.notifService.preFetchMyNotifications(this.page + 1, 10, q, 3);
+        }
+      },
+      error: () => {
+        this.loading.set(false);
       }
     });
+  }
+
+  filterNotifications() {
+    this.searchSubject.next(this.searchQuery);
+  }
+
+  onSearchChange(val: string) {
+    this.searchQuery = val;
+    this.filterNotifications();
+  }
+
+  clearSearch() {
+    this.searchQuery = '';
+    this.loadData();
   }
 
   changePage(newPage: number) {
@@ -245,15 +356,32 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loadData();
   }
 
-  markRead(id: number) {
+  markRead(id: number, message?: string) {
     this.markingReadIds.add(id);
-    setTimeout(() => {
-      this.notifService.markAsRead(id);
-      setTimeout(() => this.markingReadIds.delete(id), 1000); // Allow animation to finish
-    }, 300); // Small initial delay for animation feedback
+    this.notifService.markAsRead(id, message).subscribe({
+      next: () => {
+        // Authority logic: 
+        // We already updated the signal in the service, but to be 100% sure the list is clean (paging etc),
+        // we can reload data AFTER the server confirms success.
+        console.log('Acknowledgment confirmed by server. Synchronizing operational feed...');
+        this.loadData();
+        setTimeout(() => this.markingReadIds.delete(id), 800);
+      },
+      error: (err) => {
+        console.error('Acknowledgment failed:', err);
+        this.markingReadIds.delete(id);
+      }
+    });
   }
 
   markAllRead() {
-    this.notifService.markAllAsRead();
+    this.loading.set(true);
+    this.notifService.markAllAsRead().subscribe({
+      next: () => {
+        console.log('Bulk acknowledgment synced with central server.');
+        this.loadData();
+      },
+      error: () => this.loading.set(false)
+    });
   }
 }

@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "notifications", indexes = {
     @Index(name = "idx_notification_recipient", columnList = "recipient_id"),
-    @Index(name = "idx_notification_created", columnList = "createdAt")
+    @Index(name = "idx_notification_created", columnList = "created_at")
 })
 public class Notification {
     @Id
@@ -28,7 +28,7 @@ public class Notification {
     @Column(name = "is_read", nullable = false)
     private boolean read = false;
 
-    @Column(nullable = false)
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
     
     @PrePersist

@@ -10,9 +10,9 @@ import { ToastService } from '../../../core/services/toast.service';
   template: `
     <div class="toast-container">
       @for (t of toastService.toasts(); track t.id) {
-        <div class="toast-entry animate-toast-in" 
+        <div class="toast-entry animate-toast-in clickable" 
              [class]="t.type.toLowerCase()"
-             (click)="goToDashboard(t.id)">
+             (click)="goToDashboard($event, t.id)">
           <div class="toast-content">
             <div class="toast-icon">
               <svg *ngIf="t.type === 'INFO'" viewBox="0 0 24 24" class="icon"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -35,19 +35,21 @@ import { ToastService } from '../../../core/services/toast.service';
       top: 1.5rem;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 100000;
+      z-index: 200000;
       display: flex;
       flex-direction: column;
+      align-items: center;
       gap: 0.75rem;
       pointer-events: none;
       width: 100%;
-      max-width: 450px;
       padding: 0 1rem;
     }
     
     .toast-entry {
-      pointer-events: auto;
-      background: rgba(30, 41, 59, 0.95);
+      pointer-events: auto !important;
+      opacity: 1 !important;
+      background: #1e293b; /* Solid background fallback */
+      background: rgba(30, 41, 59, 0.98);
       backdrop-filter: blur(20px) saturate(200%);
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 16px;
@@ -59,7 +61,9 @@ import { ToastService } from '../../../core/services/toast.service';
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 
                   0 0 20px rgba(225, 29, 72, 0.1);
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
     }
+    .toast-entry:hover { transform: scale(1.02); border-color: rgba(255, 255, 255, 0.2); background: rgba(30, 41, 59, 1); }
     
     .toast-entry.info { border-left: 4px solid #3b82f6; }
     .toast-entry.warning { border-left: 4px solid #f59e0b; }
@@ -101,7 +105,9 @@ export class ToastComponent {
   toastService = inject(ToastService);
   private router = inject(Router);
 
-  goToDashboard(id: number) {
+  goToDashboard(event: Event, id: number) {
+    event.stopPropagation();
+    console.log('Toast clicked, navigating to Dashboard...');
     this.router.navigate(['/dashboard'], { queryParams: { refresh: Date.now() } });
     this.toastService.remove(id);
   }

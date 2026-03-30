@@ -30,11 +30,20 @@ export class AppComponent {
       if (this.isLoggedIn()) {
         console.log('User logged in, initializing real-time link...');
         this.wsService.connect();
-        this.notifService.loadInitialData();
+        this.notifService.loadInitialData(0, 10);
+        this.notifService.preFetchMyNotifications(0, 10, undefined, 3);
+        
+        // Zero-Latency Proactive Load for Admins
+        const user = this.authService.currentUser();
+        if (user?.role === 'ROLE_ADMIN') {
+          console.log('Elevated status detected. Pre-fetching administrative matrices...');
+          this.notifService.preFetchHistory(0, 10, undefined, 3);
+          this.notifService.preFetchUsers(0, 10, undefined, 3);
+        }
       } else {
         this.wsService.disconnect();
       }
-    });
+    }, { allowSignalWrites: true });
   }
 
   logout() {
